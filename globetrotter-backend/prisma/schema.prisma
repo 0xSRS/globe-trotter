@@ -22,6 +22,8 @@ model User {
   createdAt       DateTime @default(now()) @map("created_at")
   trips           Trip[]
   @@map("users")
+  isAdmin   Boolean @default(false) @map("is_admin")
+  isActive  Boolean @default(true)  @map("is_active")
 }
 
 model Trip {
@@ -50,6 +52,7 @@ model City {
   imageUrl   String?    @map("image_url")
   stops      TripStop[]
   activities Activity[]
+  savedBy    UserSavedCity[]
   @@map("cities")
 }
 
@@ -104,3 +107,42 @@ model Budget {
 }
 
 // === END OF MEMBER A MODELS — Member B appends below ===
+model CommunityPost {
+  id        Int      @id @default(autoincrement())
+  userId    Int      @map("user_id")
+  tripId    Int?     @map("trip_id")
+  content   String   @db.Text
+  createdAt DateTime @default(now()) @map("created_at")
+  comments  CommunityComment[]
+  likes     CommunityLike[]
+  @@map("community_posts")
+}
+
+model CommunityComment {
+  id        Int      @id @default(autoincrement())
+  postId    Int      @map("post_id")
+  userId    Int      @map("user_id")
+  content   String   @db.Text
+  createdAt DateTime @default(now()) @map("created_at")
+  post      CommunityPost @relation(fields: [postId], references: [id], onDelete: Cascade)
+  @@map("community_comments")
+}
+
+model CommunityLike {
+  id        Int      @id @default(autoincrement())
+  postId    Int      @map("post_id")
+  userId    Int      @map("user_id")
+  createdAt DateTime @default(now()) @map("created_at")
+  post      CommunityPost @relation(fields: [postId], references: [id], onDelete: Cascade)
+  @@unique([postId, userId])
+  @@map("community_likes")
+}
+
+model UserSavedCity {
+  id        Int      @id @default(autoincrement())
+  userId    Int      @map("user_id")
+  cityId    Int      @map("city_id")
+  createdAt DateTime @default(now()) @map("created_at")
+  city      City     @relation(fields: [cityId], references: [id])
+  @@map("user_saved_cities")
+}

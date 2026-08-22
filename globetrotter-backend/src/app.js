@@ -15,7 +15,13 @@ app.use('/api/cities', require('./routes/search.routes').cityRouter);
 app.use('/api/activities', require('./routes/search.routes').activityRouter);
 app.use('/api/trips', require('./routes/budget.routes'));
 // === END OF MEMBER A ROUTES — Member B appends new app.use() lines below ===
-
+app.use('/api/users', require('./routes/user.routes'));
+app.use('/api/trips', require('./routes/itineraryView.routes'));
+app.use('/api/trips', require('./routes/calendar.routes'));
+app.use('/api/community', require('./routes/community.routes'));
+app.use('/api/trips', require('./routes/sharing.routes'));
+app.use('/api/public', require('./routes/sharing.routes'));
+app.use('/api/admin', require('./routes/admin.routes'));
 app.use((req, res) => {
   res.status(404).json({ error: 'Route not found', statusCode: 404 });
 });
