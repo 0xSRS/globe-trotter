@@ -10,6 +10,10 @@ app.use(express.json());
 
 app.use('/api/auth', require('./routes/auth.routes'));
 app.use('/api/trips', require('./routes/trip.routes'));
+app.use('/api/trips', require('./routes/itinerary.routes'));
+app.use('/api/cities', require('./routes/search.routes').cityRouter);
+app.use('/api/activities', require('./routes/search.routes').activityRouter);
+app.use('/api/trips', require('./routes/budget.routes'));
 // === END OF MEMBER A ROUTES — Member B appends new app.use() lines below ===
 
 app.use((req, res) => {
