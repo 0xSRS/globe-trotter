@@ -1,4 +1,5 @@
 const prisma = require('../config/db');
+const toDate = require('../utils/toDate.util');
 
 const TRIP_DETAIL_INCLUDE = {
   stops: {
@@ -18,8 +19,8 @@ async function createTrip(userId, { name, startDate, endDate, description, cover
     data: {
       userId,
       name,
-      startDate,
-      endDate,
+      startDate: toDate(startDate),
+      endDate: toDate(endDate),
       description,
       coverPhoto,
     },
@@ -57,9 +58,13 @@ async function updateTrip(tripId, userId, updateData) {
     throw err;
   }
 
+  const data = { ...updateData };
+  if (data.startDate !== undefined) data.startDate = toDate(data.startDate);
+  if (data.endDate !== undefined) data.endDate = toDate(data.endDate);
+
   return prisma.trip.update({
     where: { id: tripId },
-    data: updateData,
+    data,
   });
 }
 

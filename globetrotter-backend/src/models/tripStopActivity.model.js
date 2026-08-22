@@ -1,11 +1,12 @@
 const prisma = require('../config/db');
+const toDate = require('../utils/toDate.util');
 
 async function attachActivity(tripStopId, { activityId, scheduledDate, scheduledTime, costOverride }) {
   return prisma.tripStopActivity.create({
     data: {
       tripStopId,
       activityId,
-      scheduledDate,
+      scheduledDate: toDate(scheduledDate),
       scheduledTime,
       costOverride,
     },

@@ -1,4 +1,5 @@
 const prisma = require('../config/db');
+const toDate = require('../utils/toDate.util');
 
 async function createStop(tripId, { cityId, startDate, endDate, budgetForSection }) {
   const maxOrder = await prisma.tripStop.aggregate({
@@ -12,8 +13,8 @@ async function createStop(tripId, { cityId, startDate, endDate, budgetForSection
     data: {
       tripId,
       cityId,
-      startDate,
-      endDate,
+      startDate: toDate(startDate),
+      endDate: toDate(endDate),
       budgetForSection,
       orderIndex: nextOrderIndex,
     },
@@ -37,8 +38,8 @@ async function updateStop(stopId, updateData) {
   const data = {};
 
   if (updateData.cityId !== undefined) data.cityId = updateData.cityId;
-  if (updateData.startDate !== undefined) data.startDate = updateData.startDate;
-  if (updateData.endDate !== undefined) data.endDate = updateData.endDate;
+  if (updateData.startDate !== undefined) data.startDate = toDate(updateData.startDate);
+  if (updateData.endDate !== undefined) data.endDate = toDate(updateData.endDate);
   if (updateData.budgetForSection !== undefined) data.budgetForSection = updateData.budgetForSection;
 
   return prisma.tripStop.update({
