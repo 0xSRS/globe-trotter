@@ -20,10 +20,12 @@ model User {
   profilePhoto    String?  @map("profile_photo")
   languagePref    String?  @map("language_pref")
   createdAt       DateTime @default(now()) @map("created_at")
-  trips           Trip[]
-  @@map("users")
+  trips             Trip[]
+  communityPosts     CommunityPost[]
+  communityComments  CommunityComment[]
   isAdmin   Boolean @default(false) @map("is_admin")
   isActive  Boolean @default(true)  @map("is_active")
+  @@map("users")
 }
 
 model Trip {
@@ -113,6 +115,7 @@ model CommunityPost {
   tripId    Int?     @map("trip_id")
   content   String   @db.Text
   createdAt DateTime @default(now()) @map("created_at")
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   comments  CommunityComment[]
   likes     CommunityLike[]
   @@map("community_posts")
@@ -125,6 +128,7 @@ model CommunityComment {
   content   String   @db.Text
   createdAt DateTime @default(now()) @map("created_at")
   post      CommunityPost @relation(fields: [postId], references: [id], onDelete: Cascade)
+  user      User          @relation(fields: [userId], references: [id], onDelete: Cascade)
   @@map("community_comments")
 }
 

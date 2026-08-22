@@ -3,6 +3,16 @@ const communityCommentModel = require('../models/communityComment.model');
 const communityLikeModel = require('../models/communityLike.model');
 const parsePaginationParams = require('../utils/pagination.util');
 
+function shapePost(post, currentUserId) {
+  const { likes, ...rest } = post;
+  return {
+    ...rest,
+    likesCount: likes.length,
+    likedByMe: likes.some((like) => like.userId === currentUserId),
+    commentCount: post.comments.length,
+  };
+}
+
 async function createPost(req, res, next) {
   try {
     const { content, tripId } = req.body;
@@ -15,7 +25,7 @@ async function createPost(req, res, next) {
       tripId: tripId ? Number(tripId) : undefined,
     });
 
-    return res.status(201).json(post);
+    return res.status(201).json(shapePost(post, req.user.id));
   } catch (err) {
     return next(err);
   }
@@ -30,18 +40,14 @@ async function getPosts(req, res, next) {
       communityPostModel.countPosts(),
     ]);
 
-    posts = posts.map((post) => ({
-      ...post,
-      likeCount: post.likes.length,
-      commentCount: post.comments.length,
-    }));
+    posts = posts.map((post) => shapePost(post, req.user.id));
 
     if (req.query.filter === 'hasComments') {
       posts = posts.filter((p) => p.commentCount > 0);
     }
 
     if (req.query.sortBy === 'likes') {
-      posts.sort((a, b) => b.likeCount - a.likeCount);
+      posts.sort((a, b) => b.likesCount - a.likesCount);
     } else if (req.query.sortBy === 'comments') {
       posts.sort((a, b) => b.commentCount - a.commentCount);
     }
