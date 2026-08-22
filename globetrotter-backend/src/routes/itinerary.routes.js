@@ -11,10 +11,10 @@ router.use(authenticateJWT);
 router.post(
   '/:tripId/stops',
   [
-    body('cityId').isInt(),
+    body('cityId').isInt().toInt(),
     body('startDate').isISO8601(),
     body('endDate').isISO8601(),
-    body('budgetForSection').optional().isFloat(),
+    body('budgetForSection').optional().isFloat().toFloat(),
   ],
   handleValidationErrors,
   itineraryController.addStop
@@ -25,6 +25,8 @@ router.put(
   '/:tripId/stops/reorder',
   [
     body('stops').isArray(),
+    body('stops.*.stopId').isInt().toInt(),
+    body('stops.*.orderIndex').isInt().toInt(),
   ],
   handleValidationErrors,
   itineraryController.reorderStops
@@ -33,10 +35,10 @@ router.put(
 router.put(
   '/:tripId/stops/:stopId',
   [
-    body('cityId').optional().isInt(),
+    body('cityId').optional().isInt().toInt(),
     body('startDate').optional().isISO8601(),
     body('endDate').optional().isISO8601(),
-    body('budgetForSection').optional().isFloat(),
+    body('budgetForSection').optional().isFloat().toFloat(),
   ],
   handleValidationErrors,
   itineraryController.updateStop
@@ -47,10 +49,10 @@ router.delete('/:tripId/stops/:stopId', itineraryController.deleteStop);
 router.post(
   '/:tripId/stops/:stopId/activities',
   [
-    body('activityId').isInt(),
+    body('activityId').isInt().toInt(),
     body('scheduledDate').optional().isISO8601(),
     body('scheduledTime').optional(),
-    body('costOverride').optional().isFloat(),
+    body('costOverride').optional().isFloat().toFloat(),
   ],
   handleValidationErrors,
   itineraryController.addActivity

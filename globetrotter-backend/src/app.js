@@ -19,9 +19,9 @@ app.use('/api/users', require('./routes/user.routes'));
 app.use('/api/trips', require('./routes/itineraryView.routes'));
 app.use('/api/trips', require('./routes/calendar.routes'));
 app.use('/api/community', require('./routes/community.routes'));
-app.use('/api/trips', require('./routes/sharing.routes'));
-app.use('/api/public', require('./routes/sharing.routes'));
 app.use('/api/admin', require('./routes/admin.routes'));
+app.use('/api/trips', require('./routes/sharing.routes').tripRouter);
+app.use('/api/public', require('./routes/sharing.routes').publicRouter);
 app.use((req, res) => {
   res.status(404).json({ error: 'Route not found', statusCode: 404 });
 });

@@ -56,7 +56,12 @@ function assertDateOrderValid(startDate, endDate) {
 async function addStop(req, res, next) {
   try {
     const tripId = Number(req.params.tripId);
-    const { cityId, startDate, endDate, budgetForSection } = req.body;
+    // Converted with Number(...) here rather than trusting the route
+    // validator to coerce it — express-validator's isInt() only checks the
+    // shape of the value, it doesn't mutate req.body, so cityId otherwise
+    // arrives as the string "1" and Prisma rejects it (Int column expected).
+    const cityId = Number(req.body.cityId);
+    const { startDate, endDate, budgetForSection } = req.body;
 
     const trip = await verifyTripOwnership(tripId, req.user.id);
     await verifyCityExists(cityId);
@@ -86,7 +91,8 @@ async function updateStop(req, res, next) {
   try {
     const tripId = Number(req.params.tripId);
     const stopId = Number(req.params.stopId);
-    const { cityId, startDate, endDate } = req.body;
+    const cityId = req.body.cityId !== undefined ? Number(req.body.cityId) : undefined;
+    const { startDate, endDate } = req.body;
 
     const trip = await verifyTripOwnership(tripId, req.user.id);
     const existingStop = await verifyStopBelongsToTrip(stopId, tripId);
@@ -107,7 +113,7 @@ async function updateStop(req, res, next) {
       throw err;
     }
 
-    const updatedStop = await tripStopModel.updateStop(stopId, req.body);
+    const updatedStop = await tripStopModel.updateStop(stopId, { ...req.body, cityId });
 
     return res.status(200).json(updatedStop);
   } catch (err) {
@@ -137,7 +143,13 @@ async function reorderStops(req, res, next) {
 
     await verifyTripOwnership(tripId, req.user.id);
 
-    const reorderedStops = await tripStopModel.reorderStops(tripId, req.body.stops);
+    // Coerce stopId/orderIndex the same way, in case they arrive as strings.
+    const stops = (req.body.stops || []).map((s) => ({
+      stopId: Number(s.stopId),
+      orderIndex: Number(s.orderIndex),
+    }));
+
+    const reorderedStops = await tripStopModel.reorderStops(tripId, stops);
 
     return res.status(200).json(reorderedStops);
   } catch (err) {
@@ -149,7 +161,8 @@ async function addActivity(req, res, next) {
   try {
     const tripId = Number(req.params.tripId);
     const stopId = Number(req.params.stopId);
-    const { activityId, scheduledDate, scheduledTime, costOverride } = req.body;
+    const activityId = Number(req.body.activityId);
+    const { scheduledDate, scheduledTime, costOverride } = req.body;
 
     await verifyTripOwnership(tripId, req.user.id);
     await verifyStopBelongsToTrip(stopId, tripId);
