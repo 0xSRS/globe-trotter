@@ -69,14 +69,16 @@ export default function MainLanding({
   const [cities, setCities] = useState(DEFAULT_CITIES);
   const [isLoading, setIsLoading] = useState(false);
 
+  // Check admin authorization via email
+  const isAdmin = user?.email?.toLowerCase().trim() === 'admin@gmail.com';
+
   // Embedded Calendar States
-  const [currentCalendarDate, setCurrentCalendarDate] = useState(new Date(2026, 7, 1)); // August 2026
+  const [currentCalendarDate, setCurrentCalendarDate] = useState(new Date(2026, 7, 1));
   const [calendarTrips, setCalendarTrips] = useState([]);
   const [isCalendarLoading, setIsCalendarLoading] = useState(false);
   const [selectedDayTrips, setSelectedDayTrips] = useState([]);
   const [selectedDateStr, setSelectedDateStr] = useState('');
 
-  // 1. Fetch Featured Destinations
   useEffect(() => {
     async function loadPopularDestinations() {
       try {
@@ -101,7 +103,6 @@ export default function MainLanding({
     loadPopularDestinations();
   }, []);
 
-  // 2. Fetch Calendar Trips
   const currentYear = currentCalendarDate.getFullYear();
   const currentMonth = currentCalendarDate.getMonth();
   const monthName = currentCalendarDate.toLocaleString('default', { month: 'long' });
@@ -131,8 +132,7 @@ export default function MainLanding({
     fetchTripsForMonth();
   }, [currentMonth, currentYear]);
 
-  // Calendar Calculation Helpers
-  const firstDayIndex = (new Date(currentYear, currentMonth, 1).getDay() + 6) % 7; // Monday = 0
+  const firstDayIndex = (new Date(currentYear, currentMonth, 1).getDay() + 6) % 7;
   const daysInMonth = new Date(currentYear, currentMonth + 1, 0).getDate();
   const daysArray = Array.from({ length: daysInMonth }, (_, i) => i + 1);
 
@@ -179,7 +179,7 @@ export default function MainLanding({
               <Logo className="w-7 h-7 text-[#EFE5D8]" />
             </div>
             <div>
-              <span className="font-serif text-lg font-bold tracking-wider uppercase">GlobeTrotter</span>
+              <span className="font-serif text-lg font-bold tracking-wider uppercase">GlobalTrotter</span>
               <p className="text-[9px] uppercase font-mono tracking-widest text-slate-400">Expedition Hub</p>
             </div>
           </div>
@@ -213,14 +213,17 @@ export default function MainLanding({
               <span>Community</span>
             </button>
 
-            <button
-              type="button"
-              onClick={onNavigateToAdmin}
-              className="px-3.5 py-2 rounded-xl text-slate-300 hover:text-white hover:bg-slate-800/60 transition-all flex items-center gap-1.5 cursor-pointer active:scale-95"
-            >
-              <ShieldCheck className="w-3.5 h-3.5 text-rose-400" />
-              <span>Admin</span>
-            </button>
+            {/* Admin link visible exclusively for admin@gmail.com */}
+            {isAdmin && (
+              <button
+                type="button"
+                onClick={onNavigateToAdmin}
+                className="px-3.5 py-2 rounded-xl border border-rose-500/30 bg-rose-500/10 text-rose-400 hover:bg-rose-500/20 transition-all flex items-center gap-1.5 cursor-pointer active:scale-95"
+              >
+                <ShieldCheck className="w-3.5 h-3.5" />
+                <span>Admin</span>
+              </button>
+            )}
           </nav>
 
           {/* User Controls */}
@@ -424,7 +427,6 @@ export default function MainLanding({
           <div className={`p-6 rounded-[32px] border shadow-2xl ${
             isDarkMode ? 'bg-[#0f1722]/80 border-slate-800' : 'bg-white border-slate-200'
           }`}>
-            {/* Weekdays */}
             <div className="grid grid-cols-7 gap-2 text-center pb-4 border-b border-slate-800/80">
               {['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map((dayStr) => (
                 <span key={dayStr} className="text-[11px] font-mono font-bold uppercase text-slate-400">
@@ -433,7 +435,6 @@ export default function MainLanding({
               ))}
             </div>
 
-            {/* Days Matrix */}
             {isCalendarLoading ? (
               <div className="p-16 flex flex-col items-center justify-center gap-3 font-mono text-xs text-teal-400">
                 <Loader2 className="w-8 h-8 animate-spin" />
@@ -441,12 +442,10 @@ export default function MainLanding({
               </div>
             ) : (
               <div className="grid grid-cols-7 gap-2 pt-4">
-                {/* Leading Blank Cells */}
                 {Array.from({ length: firstDayIndex }).map((_, idx) => (
                   <div key={`empty-${idx}`} className="h-20 sm:h-24 rounded-2xl bg-slate-900/20 opacity-30" />
                 ))}
 
-                {/* Active Month Days */}
                 {daysArray.map((dayNum) => {
                   const dayTrips = getTripsForDay(dayNum);
                   const hasTrips = dayTrips.length > 0;
