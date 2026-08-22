@@ -1,6 +1,12 @@
+import React from 'react';
+import CalendarView from './CalendarView'; // This imports the file you just made
+
 const App = () => {
   return (
-    <div>App</div>
+    <div>
+      {/* This tells the main screen to display your calendar */}
+      <CalendarView />
+    </div>
   )
 }
 
