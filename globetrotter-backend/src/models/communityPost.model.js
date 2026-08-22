@@ -1,7 +1,17 @@
 const prisma = require('../config/db');
 
 const POST_INCLUDE = {
-  comments: { orderBy: { createdAt: 'asc' } },
+  user: {
+    select: { id: true, firstName: true, lastName: true, profilePhoto: true },
+  },
+  comments: {
+    include: {
+      user: {
+        select: { id: true, firstName: true, lastName: true },
+      },
+    },
+    orderBy: { createdAt: 'asc' },
+  },
   likes: true,
 };
 

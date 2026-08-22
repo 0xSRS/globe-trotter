@@ -14,7 +14,7 @@ router.post(
   '/:tripId/budget',
   [
     body('category').isIn(['transport', 'stay', 'meals']),
-    body('amount').isFloat({ min: 0 }),
+    body('amount').isFloat({ min: 0 }).toFloat(),
   ],
   handleValidationErrors,
   budgetController.upsertBudget
