@@ -1,6 +1,9 @@
+import Login from "./routes/login.jsx"
 const App = () => {
   return (
-    <div>App</div>
+    <div>
+      <Login/>
+    </div>
   )
 }
 
