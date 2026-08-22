@@ -14,7 +14,6 @@ import CalendarView from './routes/calendarView.jsx';
 import AdminPanel from './routes/adminPanel.jsx';
 
 export default function App() {
-  // Navigation State
   const [currentScreen, setCurrentScreen] = useState('dashboard');
   
   const [user, setUser] = useState({
@@ -27,14 +26,15 @@ export default function App() {
   });
 
   const [activeTrip, setActiveTrip] = useState({
+    id: 1,
     name: 'Interlaken & Jungfrau Region',
     startDate: '2026-09-10',
     endDate: '2026-09-20'
   });
 
   return (
-    <div className="min-h-screen w-full">
-      {/* 1. Dashboard */}
+    <div className="min-h-screen w-full bg-[#090e15] text-slate-100 selection:bg-teal-500/30">
+      {/* 1. Entry Dashboard */}
       {currentScreen === 'dashboard' && (
         <Dashboard
           onNavigateToLogin={() => setCurrentScreen('login')}
@@ -43,18 +43,23 @@ export default function App() {
         />
       )}
 
-      {/* 2. Login */}
+      {/* 2. Authentication: Login */}
       {currentScreen === 'login' && (
         <Login
           onLoginSuccess={(token, userData) => {
-            setUser((prev) => ({ ...prev, name: userData.username || prev.name }));
+            if (token) localStorage.setItem('token', token);
+            setUser((prev) => ({ 
+              ...prev, 
+              name: userData?.firstName ? `${userData.firstName} ${userData.lastName || ''}`.trim() : (userData?.name || prev.name),
+              email: userData?.email || prev.email
+            }));
             setCurrentScreen('main');
           }}
           onNavigateToRegister={() => setCurrentScreen('register')}
         />
       )}
 
-      {/* 3. Register */}
+      {/* 3. Authentication: Register */}
       {currentScreen === 'register' && (
         <Register
           onRegisterSuccess={() => setCurrentScreen('login')}
@@ -62,13 +67,29 @@ export default function App() {
         />
       )}
 
-      {/* Screen 3: Main Landing */}
+      {/* Screen 3: Main Landing Hub */}
       {currentScreen === 'main' && (
         <MainLanding
           user={user}
-          onLogout={() => setCurrentScreen('dashboard')}
-          onPlanTrip={() => setCurrentScreen('create-trip')}
+          onLogout={() => {
+            localStorage.removeItem('token');
+            setCurrentScreen('dashboard');
+          }}
+          onPlanTrip={(selectedCity) => {
+            if (selectedCity?.name) {
+              setActiveTrip((prev) => ({
+                ...prev,
+                name: `Journey to ${selectedCity.name}`
+              }));
+            }
+            setCurrentScreen('create-trip');
+          }}
           onNavigateToProfile={() => setCurrentScreen('profile')}
+          onNavigateToTrips={() => setCurrentScreen('trip-listing')}
+          onNavigateToSearch={() => setCurrentScreen('search-page')}
+          onNavigateToCommunity={() => setCurrentScreen('community')}
+          onNavigateToCalendar={() => setCurrentScreen('calendar')}
+          onNavigateToAdmin={() => setCurrentScreen('admin')}
         />
       )}
 
@@ -77,6 +98,10 @@ export default function App() {
         <Profile
           user={user}
           onBackToMain={() => setCurrentScreen('main')}
+          onSelectTrip={(selected) => {
+            if (selected) setActiveTrip(selected);
+            setCurrentScreen('itinerary-view');
+          }}
         />
       )}
 
@@ -87,7 +112,7 @@ export default function App() {
           onBackToMain={() => setCurrentScreen('main')}
           onNavigateToProfile={() => setCurrentScreen('profile')}
           onTripCreated={(tripData) => {
-            setActiveTrip(tripData);
+            setActiveTrip(tripData || { id: 1, name: 'Custom Expedition' });
             setCurrentScreen('build-itinerary');
           }}
         />
@@ -110,7 +135,11 @@ export default function App() {
           user={user}
           onBackToMain={() => setCurrentScreen('main')}
           onNavigateToProfile={() => setCurrentScreen('profile')}
-          onSelectTrip={() => setCurrentScreen('itinerary-view')}
+          onAddNewTrip={() => setCurrentScreen('create-trip')}
+          onSelectTrip={(selected) => {
+            if (selected) setActiveTrip(selected);
+            setCurrentScreen('itinerary-view');
+          }}
         />
       )}
 
@@ -127,7 +156,9 @@ export default function App() {
       {/* Screen 9: Itinerary & Budget View */}
       {currentScreen === 'itinerary-view' && (
         <ItineraryView
+          tripId={activeTrip.id || 1}
           placeName={activeTrip.name}
+          trip={activeTrip}
           user={user}
           onBackToMain={() => setCurrentScreen('main')}
           onNavigateToProfile={() => setCurrentScreen('profile')}
@@ -150,7 +181,7 @@ export default function App() {
           onBackToMain={() => setCurrentScreen('main')}
           onNavigateToProfile={() => setCurrentScreen('profile')}
           onSelectTrip={(trip) => {
-            setActiveTrip({ name: trip.name, startDate: '2026-09-10', endDate: '2026-09-20' });
+            if (trip) setActiveTrip(trip);
             setCurrentScreen('itinerary-view');
           }}
         />
@@ -164,37 +195,6 @@ export default function App() {
           onNavigateToProfile={() => setCurrentScreen('profile')}
         />
       )}
-
-      {/* Floating Dev Navigation Bar */}
-      <div className="fixed bottom-4 left-1/2 -translate-x-1/2 z-50 flex items-center gap-1 px-3 py-2 rounded-full border border-slate-700 bg-slate-900/90 backdrop-blur-md shadow-2xl text-[10px] font-mono">
-        <span className="text-slate-500 pr-1">DEV:</span>
-        {[
-          { id: 'dashboard', label: 'Home' },
-          { id: 'login', label: 'Login' },
-          { id: 'main', label: 'Landing (S3)' },
-          { id: 'create-trip', label: 'Create (S4)' },
-          { id: 'build-itinerary', label: 'Itinerary (S5)' },
-          { id: 'trip-listing', label: 'Trips (S6)' },
-          { id: 'profile', label: 'Profile (S7)' },
-          { id: 'search-page', label: 'Search (S8)' },
-          { id: 'itinerary-view', label: 'Timeline (S9)' },
-          { id: 'community', label: 'Community (S10)' },
-          { id: 'calendar', label: 'Calendar (S11)' },
-          { id: 'admin', label: 'Admin (S12)' }
-        ].map((tab) => (
-          <button
-            key={tab.id}
-            onClick={() => setCurrentScreen(tab.id)}
-            className={`px-2 py-1 rounded-full transition-all cursor-pointer ${
-              currentScreen === tab.id
-                ? 'bg-teal-600 text-white font-bold'
-                : 'text-slate-400 hover:text-white hover:bg-slate-800'
-            }`}
-          >
-            {tab.label}
-          </button>
-        ))}
-      </div>
     </div>
   );
 }

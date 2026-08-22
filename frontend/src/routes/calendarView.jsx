@@ -1,367 +1,293 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { api } from '../services/api';
 import Logo from '../components/Logo';
 import { 
-  Search, 
-  Layers, 
-  Filter, 
-  ArrowUpDown, 
+  Calendar as CalendarIcon, 
   ChevronLeft, 
   ChevronRight, 
+  MapPin, 
   ArrowLeft, 
   Sun, 
   Moon, 
-  User, 
-  Calendar as CalendarIcon,
-  Sparkles,
-  MapPin,
-  Clock
+  Loader2,
+  Compass
 } from 'lucide-react';
 
-const CalendarView = ({ 
-  user = { name: "Explorer", avatar: null },
+export default function CalendarView({
+  user,
   onBackToMain,
+  onBack,
   onNavigateToProfile,
   onSelectTrip
-}) => {
+}) {
   const [isDarkMode, setIsDarkMode] = useState(true);
-  const [searchQuery, setSearchQuery] = useState('');
-  const [groupBy, setGroupBy] = useState('Month');
-  const [sortBy, setSortBy] = useState('Date');
-  const [currentMonthIndex, setCurrentMonthIndex] = useState(8); // September 2026
+  const [currentDate, setCurrentDate] = useState(new Date(2026, 7, 1)); // August 2026
+  const [trips, setTrips] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [selectedDayTrips, setSelectedDayTrips] = useState([]);
+  const [selectedDateStr, setSelectedDateStr] = useState('');
 
-  const months = [
-    "January", "February", "March", "April", "May", "June",
-    "July", "August", "September", "October", "November", "December"
-  ];
-  const year = 2026;
+  const handleBack = onBackToMain || onBack;
 
-  // Calendar Scheduled Trips (Matching Screen 11 Wireframe style: Paris Trip, NYC Getaway, Japan Adventure)
-  const scheduledTrips = [
-    {
-      id: 'cal-1',
-      name: "PARIS TRIP",
-      startDay: 4,
-      endDay: 6,
-      color: "bg-teal-500/20 border-teal-500/50 text-teal-300",
-      solidColor: "bg-teal-500",
-      location: "Paris, France"
-    },
-    {
-      id: 'cal-2',
-      name: "NYC – GETAWAY",
-      startDay: 13,
-      endDay: 16,
-      color: "bg-amber-500/20 border-amber-500/50 text-amber-300",
-      solidColor: "bg-amber-500",
-      location: "New York, USA"
-    },
-    {
-      id: 'cal-3',
-      name: "JAPAN ADVENTURE",
-      startDay: 18,
-      endDay: 23,
-      color: "bg-indigo-500/20 border-indigo-500/50 text-indigo-300",
-      solidColor: "bg-indigo-500",
-      location: "Tokyo & Kyoto, Japan"
-    },
-    {
-      id: 'cal-4',
-      name: "ALPINE CROSSING",
-      startDay: 26,
-      endDay: 29,
-      color: "bg-rose-500/20 border-rose-500/50 text-rose-300",
-      solidColor: "bg-rose-500",
-      location: "Interlaken, Switzerland"
+  const currentYear = currentDate.getFullYear();
+  const currentMonth = currentDate.getMonth(); // 0-indexed
+
+  const monthName = currentDate.toLocaleString('default', { month: 'long' });
+
+  // Load trips from backend API
+  const fetchMonthTrips = async () => {
+    try {
+      setIsLoading(true);
+      // Query month=1..12
+      const data = await api.trips.getCalendar(currentMonth + 1, currentYear);
+      if (Array.isArray(data) && data.length > 0) {
+        setTrips(data);
+      } else {
+        // Fallback to all user trips if calendar-specific endpoint returns empty
+        const allTrips = await api.trips.getAll();
+        setTrips(Array.isArray(allTrips) ? allTrips : []);
+      }
+    } catch (err) {
+      try {
+        const allTrips = await api.trips.getAll();
+        setTrips(Array.isArray(allTrips) ? allTrips : []);
+      } catch (e) {
+        setTrips([]);
+      }
+    } finally {
+      setIsLoading(false);
     }
-  ];
+  };
 
-  const daysOfWeek = ["SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT"];
+  useEffect(() => {
+    fetchMonthTrips();
+  }, [currentMonth, currentYear]);
 
-  // 35-day grid setup for current view
-  const daysInGrid = Array.from({ length: 35 }, (_, i) => {
-    const dayNumber = i - 1; // offset start
-    return dayNumber > 0 && dayNumber <= 30 ? dayNumber : null;
-  });
+  const handlePrevMonth = () => {
+    setCurrentDate(new Date(currentYear, currentMonth - 1, 1));
+  };
+
+  const handleNextMonth = () => {
+    setCurrentDate(new Date(currentYear, currentMonth + 1, 1));
+  };
+
+  // Calendar Grid Calculation
+  const firstDayIndex = (new Date(currentYear, currentMonth, 1).getDay() + 6) % 7; // Monday = 0
+  const daysInMonth = new Date(currentYear, currentMonth + 1, 0).getDate();
+  const daysArray = Array.from({ length: daysInMonth }, (_, i) => i + 1);
+
+  // Check which trips overlap on a given day
+  const getTripsForDay = (dayNumber) => {
+    const checkDate = new Date(currentYear, currentMonth, dayNumber);
+    checkDate.setHours(0, 0, 0, 0);
+
+    return trips.filter((trip) => {
+      if (!trip.startDate || !trip.endDate) return false;
+      const start = new Date(trip.startDate);
+      start.setHours(0, 0, 0, 0);
+      const end = new Date(trip.endDate);
+      end.setHours(0, 0, 0, 0);
+      return checkDate >= start && checkDate <= end;
+    });
+  };
+
+  const handleDayClick = (dayNumber) => {
+    const tripsOnDay = getTripsForDay(dayNumber);
+    setSelectedDayTrips(tripsOnDay);
+    setSelectedDateStr(`${monthName} ${dayNumber}, ${currentYear}`);
+  };
 
   return (
-    <div className={`min-h-screen w-full transition-colors duration-500 font-sans ${
+    <div className={`min-h-screen w-full font-sans select-none transition-colors duration-500 ${
       isDarkMode ? 'bg-[#090e15] text-slate-100' : 'bg-[#f8fafc] text-slate-900'
     }`}>
-
-      {/* 1. TOP HEADER (Screen 11 Header) */}
-      <header className={`sticky top-0 z-50 border-b backdrop-blur-xl transition-colors ${
-        isDarkMode ? 'bg-[#0b121c]/90 border-slate-800/80' : 'bg-white/90 border-slate-200 shadow-xs'
+      {/* Header */}
+      <header className={`sticky top-0 z-50 border-b backdrop-blur-xl ${
+        isDarkMode ? 'bg-[#0b121c]/90 border-slate-800' : 'bg-white/90 border-slate-200'
       }`}>
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 h-20 flex items-center justify-between">
-          
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 h-20 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <button 
-              onClick={onBackToMain}
-              className={`p-2 rounded-xl border transition-all cursor-pointer mr-1 ${
-                isDarkMode 
-                  ? 'bg-slate-800/70 border-slate-700 hover:bg-slate-700 text-slate-300' 
-                  : 'bg-slate-100 border-slate-200 hover:bg-slate-200 text-slate-700'
-              }`}
-              title="Back"
+              type="button"
+              onClick={() => {
+                if (handleBack) handleBack();
+                else window.history.back();
+              }}
+              className="p-2.5 rounded-xl border border-slate-700 hover:bg-slate-800 text-slate-300 hover:text-white transition-all cursor-pointer shadow-xs active:scale-95"
+              title="Return to Main Landing"
             >
               <ArrowLeft className="w-4 h-4" />
             </button>
-            <div className="p-1.5 rounded-2xl border border-slate-700/80 bg-slate-900 flex items-center justify-center">
+            <div className="p-1.5 rounded-2xl border border-slate-700 bg-slate-900 flex items-center justify-center">
               <Logo className="w-7 h-7 text-[#EFE5D8]" />
             </div>
             <div>
-              <span className="font-serif text-lg font-bold tracking-wider uppercase">GlobalTrotter</span>
-              <p className="text-[9px] uppercase font-mono tracking-widest text-slate-400">Screen 11 — Calendar Timeline</p>
+              <span className="font-serif text-lg font-bold tracking-wider uppercase">GlobeTrotter</span>
+              <p className="text-[9px] uppercase font-mono tracking-widest text-slate-400">Monthly Timeline</p>
             </div>
           </div>
 
-          <div className="flex items-center gap-3">
-            <button
-              onClick={() => setIsDarkMode(!isDarkMode)}
-              className={`p-2.5 rounded-xl border transition-all cursor-pointer ${
-                isDarkMode 
-                  ? 'bg-slate-800/80 border-slate-700 text-amber-300 hover:bg-slate-700' 
-                  : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-100 shadow-xs'
-              }`}
-              aria-label="Toggle Theme"
-            >
-              {isDarkMode ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
-            </button>
-
-            {/* Circular Profile Button */}
-            <button
-              onClick={onNavigateToProfile}
-              className={`relative w-10 h-10 rounded-full border-2 transition-all duration-200 flex items-center justify-center overflow-hidden cursor-pointer hover:scale-105 active:scale-95 shadow-md ${
-                isDarkMode 
-                  ? 'border-teal-500/50 bg-slate-900 hover:border-teal-400' 
-                  : 'border-teal-600/40 bg-white hover:border-teal-600'
-              }`}
-              title="Open Profile"
-            >
-              {user.avatar ? (
-                <img src={user.avatar} alt="Profile" className="w-full h-full object-cover" />
-              ) : (
-                <User className={`w-5 h-5 ${isDarkMode ? 'text-teal-400' : 'text-teal-600'}`} />
-              )}
-            </button>
-          </div>
-
+          <button
+            type="button"
+            onClick={() => setIsDarkMode(!isDarkMode)}
+            className={`p-2.5 rounded-xl border cursor-pointer ${
+              isDarkMode ? 'bg-slate-800/80 border-slate-700 text-amber-300' : 'bg-white border-slate-200 text-slate-700'
+            }`}
+          >
+            {isDarkMode ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
+          </button>
         </div>
       </header>
 
-      {/* MAIN CONTAINER */}
-      <main className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
-
-        {/* 2. CONTROLS BAR: Search, Group by, Filter, Sort by */}
-        <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
-          
-          <div className={`relative flex-1 flex items-center rounded-2xl border transition-colors ${
-            isDarkMode 
-              ? 'bg-[#0f1722]/80 border-slate-800 focus-within:border-teal-400' 
-              : 'bg-white border-slate-200 focus-within:border-teal-600 shadow-xs'
-          }`}>
-            <Search className="w-4 h-4 ml-4 text-slate-400 shrink-0" />
-            <input
-              type="text"
-              placeholder="Search scheduled calendar milestones or trips..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full px-3 py-3 bg-transparent text-xs sm:text-sm outline-none placeholder-slate-400 font-medium"
-            />
+      {/* Main Content Area */}
+      <main className="max-w-5xl mx-auto px-4 sm:px-6 py-8 space-y-6">
+        
+        {/* Month Selector Bar */}
+        <div className={`p-6 rounded-3xl border flex items-center justify-between shadow-xl ${
+          isDarkMode ? 'bg-[#0f1722]/90 border-slate-800' : 'bg-white border-slate-200'
+        }`}>
+          <div className="flex items-center gap-3">
+            <div className="p-2 rounded-xl bg-teal-500/10 border border-teal-500/30 text-teal-400">
+              <CalendarIcon className="w-5 h-5" />
+            </div>
+            <h2 className="font-serif font-bold text-xl sm:text-2xl text-slate-100">
+              {monthName} {currentYear}
+            </h2>
           </div>
 
-          <div className="flex items-center gap-2 overflow-x-auto pb-1 sm:pb-0">
-            <button 
-              onClick={() => setGroupBy(groupBy === 'Month' ? 'Year' : 'Month')}
-              className={`inline-flex items-center gap-2 px-4 py-3 rounded-2xl border text-xs font-medium backdrop-blur-md transition-all cursor-pointer shrink-0 ${
-                isDarkMode 
-                  ? 'bg-slate-900/80 border-slate-800 hover:border-slate-700 text-slate-200' 
-                  : 'bg-white border-slate-200 hover:bg-slate-50 text-slate-700 shadow-xs'
-              }`}
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={handlePrevMonth}
+              className="p-2.5 rounded-xl border border-slate-700 bg-slate-900 hover:bg-slate-800 text-slate-300 hover:text-white transition-all cursor-pointer shadow-xs active:scale-95"
+              title="Previous Month"
             >
-              <Layers className="w-3.5 h-3.5 text-teal-400" />
-              <span>Group by: {groupBy}</span>
+              <ChevronLeft className="w-4 h-4" />
             </button>
-
-            <button 
-              className={`inline-flex items-center gap-2 px-4 py-3 rounded-2xl border text-xs font-medium backdrop-blur-md transition-all cursor-pointer shrink-0 ${
-                isDarkMode 
-                  ? 'bg-slate-900/80 border-slate-800 hover:border-slate-700 text-slate-200' 
-                  : 'bg-white border-slate-200 hover:bg-slate-50 text-slate-700 shadow-xs'
-              }`}
+            <button
+              type="button"
+              onClick={handleNextMonth}
+              className="p-2.5 rounded-xl border border-slate-700 bg-slate-900 hover:bg-slate-800 text-slate-300 hover:text-white transition-all cursor-pointer shadow-xs active:scale-95"
+              title="Next Month"
             >
-              <Filter className="w-3.5 h-3.5 text-amber-400" />
-              <span>Filter</span>
-            </button>
-
-            <button 
-              onClick={() => setSortBy(sortBy === 'Date' ? 'Duration' : 'Date')}
-              className={`inline-flex items-center gap-2 px-4 py-3 rounded-2xl border text-xs font-medium backdrop-blur-md transition-all cursor-pointer shrink-0 ${
-                isDarkMode 
-                  ? 'bg-slate-900/80 border-slate-800 hover:border-slate-700 text-slate-200' 
-                  : 'bg-white border-slate-200 hover:bg-slate-50 text-slate-700 shadow-xs'
-              }`}
-            >
-              <ArrowUpDown className="w-3.5 h-3.5 text-indigo-400" />
-              <span>Sort by: {sortBy}</span>
+              <ChevronRight className="w-4 h-4" />
             </button>
           </div>
-
         </div>
 
-        {/* 3. CALENDAR VIEW CONTAINER (Screen 11 Main White/Dark Frame) */}
-        <section className={`p-6 sm:p-10 rounded-3xl border backdrop-blur-xl transition-all duration-300 ${
-          isDarkMode 
-            ? 'bg-[#0f1722]/80 border-slate-800 shadow-2xl' 
-            : 'bg-white border-slate-200 shadow-sm'
+        {/* Calendar Interactive Grid */}
+        <div className={`p-6 rounded-3xl border shadow-xl ${
+          isDarkMode ? 'bg-[#0f1722]/80 border-slate-800' : 'bg-white border-slate-200'
         }`}>
-
-          {/* Section Header */}
-          <div className="text-center pb-6">
-            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full border border-teal-500/30 bg-teal-500/10 text-[10px] font-mono tracking-widest text-teal-400 uppercase mb-2">
-              <Sparkles className="w-3 h-3" />
-              <span>SYNCHRONIZED EXPEDITIONS</span>
-            </div>
-            <h1 className="text-2xl sm:text-3xl font-serif font-bold tracking-tight">
-              Calendar View
-            </h1>
+          {/* Weekday Headers */}
+          <div className="grid grid-cols-7 gap-2 text-center pb-4 border-b border-slate-800/80">
+            {['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map((dayStr) => (
+              <span key={dayStr} className="text-xs font-mono font-bold uppercase text-slate-400">
+                {dayStr}
+              </span>
+            ))}
           </div>
 
-          {/* Calendar Inner Board (Wireframe Box) */}
-          <div className={`rounded-3xl border overflow-hidden transition-all ${
-            isDarkMode ? 'bg-[#0b121c] border-slate-800' : 'bg-slate-50 border-slate-200'
-          }`}>
-
-            {/* Month Header with Navigation Arrows (Wireframe ← Month Year →) */}
-            <div className={`flex items-center justify-between px-6 py-5 border-b ${
-              isDarkMode ? 'border-slate-800/80 bg-slate-900/40' : 'border-slate-200 bg-white'
-            }`}>
-              <button 
-                onClick={() => setCurrentMonthIndex((prev) => (prev > 0 ? prev - 1 : 11))}
-                className="p-2 rounded-xl hover:bg-slate-800/60 transition-colors cursor-pointer text-slate-400 hover:text-white"
-              >
-                <ChevronLeft className="w-6 h-6" />
-              </button>
-
-              <h2 className="text-xl sm:text-2xl font-serif font-bold tracking-wide">
-                {months[currentMonthIndex]} {year}
-              </h2>
-
-              <button 
-                onClick={() => setCurrentMonthIndex((prev) => (prev < 11 ? prev + 1 : 0))}
-                className="p-2 rounded-xl hover:bg-slate-800/60 transition-colors cursor-pointer text-slate-400 hover:text-white"
-              >
-                <ChevronRight className="w-6 h-6" />
-              </button>
+          {/* Month Day Cells */}
+          {isLoading ? (
+            <div className="p-16 flex flex-col items-center justify-center gap-3 font-mono text-xs text-teal-400">
+              <Loader2 className="w-8 h-8 animate-spin" />
+              <span>SYNCING TIMELINE EVENTS...</span>
             </div>
-
-            {/* Weekdays Row */}
-            <div className={`grid grid-cols-7 border-b text-center py-3 text-xs font-mono font-bold tracking-wider ${
-              isDarkMode ? 'border-slate-800/80 text-slate-400 bg-slate-950/40' : 'border-slate-200 text-slate-600 bg-slate-100'
-            }`}>
-              {daysOfWeek.map((day, idx) => (
-                <div key={idx}>{day}</div>
+          ) : (
+            <div className="grid grid-cols-7 gap-2 pt-4">
+              {/* Empty leading offset days */}
+              {Array.from({ length: firstDayIndex }).map((_, idx) => (
+                <div key={`empty-${idx}`} className="h-20 sm:h-24 rounded-2xl bg-slate-900/20 opacity-30" />
               ))}
-            </div>
 
-            {/* Calendar Days Matrix Grid */}
-            <div className="grid grid-cols-7 auto-rows-[80px_sm:auto-rows-[100px]] divide-x divide-y divide-slate-800/40">
-              {daysInGrid.map((dayNum, idx) => {
-                if (!dayNum) {
-                  return (
-                    <div 
-                      key={idx} 
-                      className={`min-h-[85px] sm:min-h-[100px] p-2 ${
-                        isDarkMode ? 'bg-slate-950/20' : 'bg-slate-100/50'
-                      }`} 
-                    />
-                  );
-                }
-
-                // Check if any trip overlaps this day
-                const activeTripsForDay = scheduledTrips.filter(
-                  (t) => dayNum >= t.startDay && dayNum <= t.endDay
-                );
+              {/* Real Days */}
+              {daysArray.map((dayNum) => {
+                const dayTrips = getTripsForDay(dayNum);
+                const hasTrips = dayTrips.length > 0;
 
                 return (
                   <div
-                    key={idx}
-                    className={`min-h-[85px] sm:min-h-[100px] p-2 flex flex-col justify-between transition-colors relative ${
-                      isDarkMode ? 'hover:bg-slate-800/20' : 'hover:bg-slate-100/80'
+                    key={dayNum}
+                    onClick={() => handleDayClick(dayNum)}
+                    className={`h-20 sm:h-24 p-2 rounded-2xl border transition-all cursor-pointer flex flex-col justify-between ${
+                      hasTrips
+                        ? 'border-teal-500/50 bg-teal-950/20 hover:border-teal-400 hover:bg-teal-950/40'
+                        : 'border-slate-800/60 bg-slate-900/40 hover:border-slate-700 hover:bg-slate-900/80'
                     }`}
                   >
-                    {/* Day Number */}
-                    <div className="flex items-center justify-between">
-                      <span className={`text-xs font-mono font-bold ${
-                        dayNum === 22 ? 'text-teal-400' : 'text-slate-400'
-                      }`}>
-                        {dayNum}
-                      </span>
-                      {dayNum === 22 && (
-                        <span className="w-1.5 h-1.5 rounded-full bg-teal-400 ring-2 ring-teal-400/30" />
-                      )}
-                    </div>
+                    <span className={`text-xs font-mono font-bold ${
+                      hasTrips ? 'text-teal-400' : 'text-slate-400'
+                    }`}>
+                      {dayNum}
+                    </span>
 
-                    {/* Trip Badges Overlay inside the day box (Screen 11 Banner style) */}
-                    <div className="space-y-1 mt-1">
-                      {activeTripsForDay.map((trip) => (
-                        <div
-                          key={trip.id}
-                          onClick={() => onSelectTrip?.(trip)}
-                          className={`text-[9px] sm:text-[10px] font-mono font-bold px-1.5 py-0.5 rounded-md border truncate cursor-pointer shadow-xs transition-transform hover:scale-[1.02] ${trip.color}`}
-                          title={`${trip.name} (${trip.location})`}
-                        >
-                          {dayNum === trip.startDay ? trip.name : `• ${trip.name}`}
-                        </div>
-                      ))}
-                    </div>
+                    {hasTrips && (
+                      <div className="space-y-1 overflow-hidden">
+                        {dayTrips.slice(0, 2).map((t, tIdx) => (
+                          <div 
+                            key={t.id || tIdx}
+                            className="px-1.5 py-0.5 rounded-md bg-teal-500/20 text-teal-300 font-mono text-[9px] truncate"
+                          >
+                            {t.name}
+                          </div>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 );
               })}
             </div>
+          )}
+        </div>
 
-          </div>
-
-          {/* 4. UPCOMING EXPEDITION DRAWER / LEGEND */}
-          <div className="mt-8 pt-6 border-t border-slate-800/60 space-y-4">
-            <h3 className="text-sm font-mono uppercase tracking-wider text-slate-400">
-              Active Expedition Timelines for {months[currentMonthIndex]} {year}
-            </h3>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
-              {scheduledTrips.map((trip) => (
-                <div
-                  key={trip.id}
-                  onClick={() => onSelectTrip?.(trip)}
-                  className={`p-4 rounded-2xl border transition-all hover:scale-[1.02] cursor-pointer ${
-                    isDarkMode ? 'bg-slate-900/80 border-slate-800' : 'bg-slate-50 border-slate-200'
-                  }`}
-                >
-                  <div className="flex items-center gap-2 mb-2">
-                    <span className={`w-2.5 h-2.5 rounded-full ${trip.solidColor}`} />
-                    <h4 className="text-xs font-bold font-serif">{trip.name}</h4>
-                  </div>
-                  <div className="space-y-1 text-[11px] font-mono text-slate-400">
-                    <div className="flex items-center gap-1.5">
-                      <CalendarIcon className="w-3 h-3 text-amber-400" />
-                      <span>Sep {trip.startDay} – Sep {trip.endDay}, {year}</span>
-                    </div>
-                    <div className="flex items-center gap-1.5">
-                      <MapPin className="w-3 h-3 text-teal-400" />
-                      <span className="truncate">{trip.location}</span>
-                    </div>
-                  </div>
-                </div>
-              ))}
+        {/* Selected Day Expeditions Breakdown Drawer */}
+        {selectedDateStr && (
+          <div className={`p-6 rounded-3xl border transition-all ${
+            isDarkMode ? 'bg-[#0f1722] border-slate-800' : 'bg-white border-slate-200'
+          } space-y-4`}>
+            <div className="flex items-center justify-between pb-3 border-b border-slate-800/80">
+              <h3 className="font-serif font-bold text-base text-slate-100">
+                Scheduled for {selectedDateStr}
+              </h3>
+              <button
+                type="button"
+                onClick={() => setSelectedDateStr('')}
+                className="text-xs font-mono text-slate-400 hover:text-white"
+              >
+                Close
+              </button>
             </div>
-          </div>
 
-        </section>
+            {selectedDayTrips.length > 0 ? (
+              <div className="space-y-3">
+                {selectedDayTrips.map((trip) => (
+                  <div
+                    key={trip.id}
+                    onClick={() => onSelectTrip && onSelectTrip(trip)}
+                    className="p-4 rounded-2xl border border-slate-800 bg-slate-900/80 hover:border-teal-500/60 flex items-center justify-between cursor-pointer transition-all"
+                  >
+                    <div>
+                      <h4 className="font-bold text-sm text-slate-200">{trip.name}</h4>
+                      <p className="text-xs text-slate-400 mt-0.5">
+                        {new Date(trip.startDate).toLocaleDateString()} → {new Date(trip.endDate).toLocaleDateString()}
+                      </p>
+                    </div>
+                    <span className="text-xs font-mono text-teal-400 hover:underline">
+                      View Route →
+                    </span>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-xs font-mono text-slate-500">
+                No active journeys scheduled on this specific date.
+              </p>
+            )}
+          </div>
+        )}
 
       </main>
-
     </div>
   );
-};
-
-export default CalendarView;
+}

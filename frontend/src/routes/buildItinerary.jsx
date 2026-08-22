@@ -113,7 +113,7 @@ const BuildItinerary = ({
               <Logo className="w-7 h-7 text-[#EFE5D8]" />
             </div>
             <div>
-              <span className="font-serif text-lg font-bold tracking-wider uppercase">GlobalTrotter</span>
+              <span className="font-serif text-lg font-bold tracking-wider uppercase">GlobeTrotter</span>
               <p className="text-[9px] uppercase font-mono tracking-widest text-slate-400">Screen 5 — Build Itinerary</p>
             </div>
           </div>

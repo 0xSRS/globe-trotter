@@ -89,7 +89,7 @@ const AdminPanel = ({
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <span className="font-serif text-lg font-bold tracking-wider uppercase">GlobalTrotter</span>
+                <span className="font-serif text-lg font-bold tracking-wider uppercase">GlobeTrotter</span>
                 <span className="px-2 py-0.5 rounded-full text-[9px] font-mono bg-rose-500/10 border border-rose-500/30 text-rose-400 font-bold">
                   ADMIN CONSOLE
                 </span>
