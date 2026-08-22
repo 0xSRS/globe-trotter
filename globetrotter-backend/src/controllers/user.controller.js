@@ -44,6 +44,13 @@ async function updateMe(req, res, next) {
     if (email !== undefined) updateData.email = email;
     if (languagePref !== undefined) updateData.languagePref = languagePref;
 
+    if (email !== undefined) {
+      const existing = await userModel.findUserByEmail(email);
+      if (existing && existing.id !== req.user.id) {
+        return res.status(409).json({ error: 'Email already registered', statusCode: 409 });
+      }
+    }
+
     const user = await userModel.updateUser(req.user.id, updateData);
     return res.status(200).json(user);
   } catch (err) {

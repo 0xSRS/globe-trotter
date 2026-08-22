@@ -1,105 +1,112 @@
 const prisma = require('../config/db');
 const toDate = require('../utils/toDate.util');
 
-const TRIP_DETAIL_INCLUDE = {
-  stops: {
-    include: {
-      city: true,
-      activities: {
-        include: {
-          activity: true,
-        },
-      },
-    },
-  },
-};
+async function createStop(tripId, { cityId, startDate, endDate, budgetForSection }) {
+  const maxOrder = await prisma.tripStop.aggregate({
+    where: { tripId },
+    _max: { orderIndex: true },
+  });
 
-async function createTrip(userId, { name, startDate, endDate, description, coverPhoto }) {
-  return prisma.trip.create({
+  const nextOrderIndex = maxOrder._max.orderIndex === null ? 0 : maxOrder._max.orderIndex + 1;
+
+  return prisma.tripStop.create({
     data: {
-      userId,
-      name,
+      tripId,
+      cityId,
       startDate: toDate(startDate),
       endDate: toDate(endDate),
-      description,
-      coverPhoto,
+      budgetForSection,
+      orderIndex: nextOrderIndex,
+    },
+    include: {
+      city: true,
     },
   });
 }
 
-async function findTripsByUser(userId) {
-  return prisma.trip.findMany({
-    where: { userId },
-    orderBy: { startDate: 'desc' },
-    include: TRIP_DETAIL_INCLUDE,
+async function findStopById(stopId) {
+  const stop = await prisma.tripStop.findUnique({
+    where: { id: stopId },
+    include: {
+      city: true,
+    },
   });
+  return stop || null;
 }
 
-async function findTripById(tripId, userId) {
-  const trip = await prisma.trip.findFirst({
-    where: { id: tripId, userId },
-    include: TRIP_DETAIL_INCLUDE,
-  });
-  return trip || null;
-}
+async function updateStop(stopId, updateData) {
+  const data = {};
 
-async function updateTrip(tripId, userId, updateData) {
-  const trip = await prisma.trip.findUnique({ where: { id: tripId } });
+  if (updateData.cityId !== undefined) data.cityId = updateData.cityId;
+  if (updateData.startDate !== undefined) data.startDate = toDate(updateData.startDate);
+  if (updateData.endDate !== undefined) data.endDate = toDate(updateData.endDate);
+  if (updateData.budgetForSection !== undefined) data.budgetForSection = updateData.budgetForSection;
 
-  if (!trip) {
-    const err = new Error('Trip not found');
-    err.statusCode = 404;
-    throw err;
-  }
-
-  if (trip.userId !== userId) {
-    const err = new Error('Not authorized to edit this trip');
-    err.statusCode = 403;
-    throw err;
-  }
-
-  const data = { ...updateData };
-  if (data.startDate !== undefined) data.startDate = toDate(data.startDate);
-  if (data.endDate !== undefined) data.endDate = toDate(data.endDate);
-
-  return prisma.trip.update({
-    where: { id: tripId },
+  return prisma.tripStop.update({
+    where: { id: stopId },
     data,
+    include: {
+      city: true,
+    },
   });
 }
 
-async function deleteTrip(tripId, userId) {
-  const trip = await prisma.trip.findUnique({ where: { id: tripId } });
-
-  if (!trip) {
-    const err = new Error('Trip not found');
-    err.statusCode = 404;
-    throw err;
-  }
-
-  if (trip.userId !== userId) {
-    const err = new Error('Not authorized to edit this trip');
-    err.statusCode = 403;
-    throw err;
-  }
-
-  return prisma.trip.delete({
-    where: { id: tripId },
+async function deleteStop(stopId) {
+  return prisma.tripStop.delete({
+    where: { id: stopId },
   });
 }
 
-async function getPopularCities(limit = 6) {
-  return prisma.city.findMany({
-    orderBy: { popularity: 'desc' },
-    take: limit,
+async function reorderStops(tripId, stopsArray) {
+  const stopIds = stopsArray.map(({ stopId }) => stopId);
+
+  // Ensure every stop in the payload actually belongs to this trip before
+  // writing anything — otherwise a caller could pass stopIds from a trip
+  // they don't own and silently rewrite its ordering.
+  const existingStops = await prisma.tripStop.findMany({
+    where: { id: { in: stopIds }, tripId },
+    select: { id: true },
+  });
+
+  if (existingStops.length !== stopIds.length) {
+    const err = new Error('One or more stops do not belong to this trip');
+    err.statusCode = 400;
+    throw err;
+  }
+
+  const updates = stopsArray.map(({ stopId, orderIndex }) =>
+    prisma.tripStop.update({
+      where: { id: stopId },
+      data: { orderIndex },
+    })
+  );
+
+  await prisma.$transaction(updates);
+
+  return prisma.tripStop.findMany({
+    where: { tripId },
+    orderBy: { orderIndex: 'asc' },
+    include: {
+      city: true,
+    },
+  });
+}
+
+async function findStopsByTripId(tripId) {
+  return prisma.tripStop.findMany({
+    where: { tripId },
+    orderBy: { orderIndex: 'asc' },
+    include: {
+      city: true,
+    },
   });
 }
 
 module.exports = {
-  createTrip,
-  findTripsByUser,
-  findTripById,
-  updateTrip,
-  deleteTrip,
-  getPopularCities,
+  createStop,
+  findStopById,
+  updateStop,
+  deleteStop,
+  reorderStops,
+  findStopsByTripId,
 };

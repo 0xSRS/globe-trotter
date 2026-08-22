@@ -1,6 +1,8 @@
 const tripModel = require('../models/trip.model');
 const tripStopModel = require('../models/tripStop.model');
 const tripStopActivityModel = require('../models/tripStopActivity.model');
+const cityModel = require('../models/city.model');
+const activityModel = require('../models/activity.model');
 
 async function verifyTripOwnership(tripId, userId) {
   const trip = await tripModel.findTripById(tripId, userId);
@@ -22,12 +24,50 @@ async function verifyStopBelongsToTrip(stopId, tripId) {
   return stop;
 }
 
+async function verifyCityExists(cityId) {
+  const city = await cityModel.findCityById(cityId);
+  if (!city) {
+    const err = new Error('City not found');
+    err.statusCode = 404;
+    throw err;
+  }
+  return city;
+}
+
+async function verifyActivityExists(activityId) {
+  const activity = await activityModel.findActivityById(activityId);
+  if (!activity) {
+    const err = new Error('Activity not found');
+    err.statusCode = 404;
+    throw err;
+  }
+  return activity;
+}
+
+function assertDateOrderValid(startDate, endDate) {
+  if (startDate === undefined || endDate === undefined) return;
+  if (new Date(endDate) < new Date(startDate)) {
+    const err = new Error('endDate cannot be before startDate');
+    err.statusCode = 400;
+    throw err;
+  }
+}
+
 async function addStop(req, res, next) {
   try {
     const tripId = Number(req.params.tripId);
     const { cityId, startDate, endDate, budgetForSection } = req.body;
 
-    await verifyTripOwnership(tripId, req.user.id);
+    const trip = await verifyTripOwnership(tripId, req.user.id);
+    await verifyCityExists(cityId);
+    assertDateOrderValid(startDate, endDate);
+
+    // Keep each stop's dates inside the parent trip's date range.
+    if (new Date(startDate) < new Date(trip.startDate) || new Date(endDate) > new Date(trip.endDate)) {
+      const err = new Error('Stop dates must fall within the trip date range');
+      err.statusCode = 400;
+      throw err;
+    }
 
     const stop = await tripStopModel.createStop(tripId, {
       cityId,
@@ -46,9 +86,26 @@ async function updateStop(req, res, next) {
   try {
     const tripId = Number(req.params.tripId);
     const stopId = Number(req.params.stopId);
+    const { cityId, startDate, endDate } = req.body;
 
-    await verifyTripOwnership(tripId, req.user.id);
-    await verifyStopBelongsToTrip(stopId, tripId);
+    const trip = await verifyTripOwnership(tripId, req.user.id);
+    const existingStop = await verifyStopBelongsToTrip(stopId, tripId);
+
+    if (cityId !== undefined) {
+      await verifyCityExists(cityId);
+    }
+
+    // Validate the effective date range (fall back to existing values for
+    // whichever side of the range wasn't included in this update).
+    const effectiveStart = startDate !== undefined ? startDate : existingStop.startDate;
+    const effectiveEnd = endDate !== undefined ? endDate : existingStop.endDate;
+    assertDateOrderValid(effectiveStart, effectiveEnd);
+
+    if (new Date(effectiveStart) < new Date(trip.startDate) || new Date(effectiveEnd) > new Date(trip.endDate)) {
+      const err = new Error('Stop dates must fall within the trip date range');
+      err.statusCode = 400;
+      throw err;
+    }
 
     const updatedStop = await tripStopModel.updateStop(stopId, req.body);
 
@@ -96,6 +153,7 @@ async function addActivity(req, res, next) {
 
     await verifyTripOwnership(tripId, req.user.id);
     await verifyStopBelongsToTrip(stopId, tripId);
+    await verifyActivityExists(activityId);
 
     const activityRow = await tripStopActivityModel.attachActivity(stopId, {
       activityId,

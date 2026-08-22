@@ -34,6 +34,9 @@ async function login(req, res, next) {
     if (!isMatch) {
       return res.status(401).json({ error: 'Invalid email or password', statusCode: 401 });
     }
+    if (!user.isActive) {
+        return res.status(403).json({ error: 'This account has been deactivated', statusCode: 403 });
+    }   
 
     const token = signToken({ id: user.id, email: user.email });
     const { passwordHash, ...userWithoutPassword } = user;

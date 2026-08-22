@@ -1,130 +1,26 @@
-const prisma = require('../config/db');
-const { generateShareSlug } = require('../utils/slug.util');
-const { groupTripStopsByDay } = require('../utils/dateGrouping.util');
-const { TRIP_ITINERARY_INCLUDE } = require('./itineraryView.controller');
+const express = require('express');
+const authenticateJWT = require('../middleware/auth.middleware');
+const sharingController = require('../controllers/sharing.controller');
 
-async function shareTrip(req, res, next) {
-  try {
-    const tripId = Number(req.params.tripId);
+// This file exports TWO separate routers, since /api/trips and /api/public
+// each need only a subset of these routes. Mounting a single shared router
+// under both prefixes would expose every route under both — e.g. the
+// owner-only share action would also become reachable at
+// /api/public/:tripId/share, and the public view/copy routes would be
+// duplicated under /api/trips/trips/:slug.
+//
+// Mount in app.js as:
+//   app.use('/api/trips', require('./routes/sharing.routes').tripRouter);
+//   app.use('/api/public', require('./routes/sharing.routes').publicRouter);
 
-    const trip = await prisma.trip.findUnique({ where: { id: tripId } });
-    if (!trip) {
-      return res.status(404).json({ error: 'Trip not found', statusCode: 404 });
-    }
+const tripRouter = express.Router();
+// -> POST /api/trips/:tripId/share
+tripRouter.post('/:tripId/share', authenticateJWT, sharingController.shareTrip);
 
-    if (trip.userId !== req.user.id) {
-      return res.status(403).json({ error: 'Not authorized to share this trip', statusCode: 403 });
-    }
+const publicRouter = express.Router();
+// -> GET /api/public/trips/:slug (no auth)
+publicRouter.get('/trips/:slug', sharingController.getPublicTrip);
+// -> POST /api/public/trips/:slug/copy (auth required)
+publicRouter.post('/trips/:slug/copy', authenticateJWT, sharingController.copyPublicTrip);
 
-    let shareSlug = trip.shareSlug;
-    if (!shareSlug) {
-      shareSlug = generateShareSlug();
-    }
-
-    const updated = await prisma.trip.update({
-      where: { id: tripId },
-      data: { isPublic: true, shareSlug },
-    });
-
-    const publicUrl = `${req.protocol}://${req.get('host')}/api/public/trips/${updated.shareSlug}`;
-
-    return res.status(200).json({ publicUrl });
-  } catch (err) {
-    return next(err);
-  }
-}
-
-async function getPublicTrip(req, res, next) {
-  try {
-    const { slug } = req.params;
-
-    const trip = await prisma.trip.findUnique({
-      where: { shareSlug: slug },
-      include: TRIP_ITINERARY_INCLUDE,
-    });
-
-    if (!trip || !trip.isPublic) {
-      return res.status(404).json({ error: 'Trip not found', statusCode: 404 });
-    }
-
-    const days = groupTripStopsByDay(trip);
-
-    return res.status(200).json({
-      tripName: trip.name,
-      description: trip.description,
-      coverPhoto: trip.coverPhoto,
-      startDate: trip.startDate,
-      endDate: trip.endDate,
-      days,
-    });
-  } catch (err) {
-    return next(err);
-  }
-}
-
-async function copyPublicTrip(req, res, next) {
-  try {
-    const { slug } = req.params;
-
-    const sourceTrip = await prisma.trip.findUnique({
-      where: { shareSlug: slug },
-      include: {
-        stops: {
-          include: { activities: true },
-        },
-      },
-    });
-
-    if (!sourceTrip || !sourceTrip.isPublic) {
-      return res.status(404).json({ error: 'Trip not found', statusCode: 404 });
-    }
-
-    const newTrip = await prisma.$transaction(async (tx) => {
-      const created = await tx.trip.create({
-        data: {
-          userId: req.user.id,
-          name: sourceTrip.name,
-          startDate: sourceTrip.startDate,
-          endDate: sourceTrip.endDate,
-          description: sourceTrip.description,
-          coverPhoto: sourceTrip.coverPhoto,
-          isPublic: false,
-          shareSlug: null,
-        },
-      });
-
-      for (const stop of sourceTrip.stops) {
-        const newStop = await tx.tripStop.create({
-          data: {
-            tripId: created.id,
-            cityId: stop.cityId,
-            startDate: stop.startDate,
-            endDate: stop.endDate,
-            orderIndex: stop.orderIndex,
-            budgetForSection: stop.budgetForSection,
-          },
-        });
-
-        for (const tsa of stop.activities) {
-          await tx.tripStopActivity.create({
-            data: {
-              tripStopId: newStop.id,
-              activityId: tsa.activityId,
-              scheduledDate: tsa.scheduledDate,
-              scheduledTime: tsa.scheduledTime,
-              costOverride: tsa.costOverride,
-            },
-          });
-        }
-      }
-
-      return created;
-    });
-
-    return res.status(201).json(newTrip);
-  } catch (err) {
-    return next(err);
-  }
-}
-
-module.exports = { shareTrip, getPublicTrip, copyPublicTrip };
+module.exports = { tripRouter, publicRouter };

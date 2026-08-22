@@ -58,6 +58,22 @@ async function deleteStop(stopId) {
 }
 
 async function reorderStops(tripId, stopsArray) {
+  const stopIds = stopsArray.map(({ stopId }) => stopId);
+
+  // Ensure every stop in the payload actually belongs to this trip before
+  // writing anything — otherwise a caller could pass stopIds from a trip
+  // they don't own and silently rewrite its ordering.
+  const existingStops = await prisma.tripStop.findMany({
+    where: { id: { in: stopIds }, tripId },
+    select: { id: true },
+  });
+
+  if (existingStops.length !== stopIds.length) {
+    const err = new Error('One or more stops do not belong to this trip');
+    err.statusCode = 400;
+    throw err;
+  }
+
   const updates = stopsArray.map(({ stopId, orderIndex }) =>
     prisma.tripStop.update({
       where: { id: stopId },
