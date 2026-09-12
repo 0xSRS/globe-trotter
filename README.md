@@ -20,7 +20,6 @@
 - [Project Structure](#-project-structure)
 - [Scalability & Future Roadmap](#-scalability--future-roadmap)
 - [Feasibility](#-feasibility)
-- [Team](#-team)
 
 ---
 
